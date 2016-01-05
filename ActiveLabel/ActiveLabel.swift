@@ -259,7 +259,18 @@ public protocol ActiveLabelDelegate: class {
             case .None: ()
             }
             
-            for element in elements {
+            let maxLenght: Int = 6
+            
+            for var element in elements {
+                if let text = element.element.stringURL where text.characters.count > maxLenght {
+                    let trimmedText = text.substringToIndex(text.startIndex.advancedBy(maxLenght))
+                    mutAttrString.replaceCharactersInRange(element.range, withString: trimmedText)
+                    element.range.length = maxLenght
+                    if let index = activeElements[.URL]?.indexOf({ $0.element.stringURL == text }) {
+                        activeElements[.URL]?.removeAtIndex(index)
+                        activeElements[.URL]?.append((element.range, ActiveElement.URL(trimmedText)))
+                    }
+                }
                 mutAttrString.setAttributes(attributes, range: element.range)
             }
         }

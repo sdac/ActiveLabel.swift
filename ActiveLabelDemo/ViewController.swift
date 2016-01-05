@@ -28,8 +28,8 @@ class ViewController: UIViewController {
         label.handleMentionTap { self.alert("Mention", message: $0) }
         label.handleHashtagTap { self.alert("Hashtag", message: $0) }
         label.handleURLTap { self.alert("URL", message: $0.description) }
-        
         label.frame = CGRect(x: 20, y: 40, width: view.frame.width - 40, height: 300)
+        label.sizeToFit()
         view.addSubview(label)
         
         

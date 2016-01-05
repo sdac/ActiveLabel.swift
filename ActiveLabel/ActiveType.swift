@@ -13,6 +13,15 @@ enum ActiveElement {
     case Hashtag(String)
     case URL(String)
     case None
+    
+    var stringURL: String? {
+        switch self {
+        case .URL(let text):
+            return text
+        case .Mention, .Hashtag, .None:
+            return nil
+        }
+    }
 }
 
 public enum ActiveType {
