@@ -170,7 +170,7 @@ public protocol ActiveLabelDelegate: class {
             switch selectedElement.element {
             case .Mention(let userHandle): didTapMention(userHandle)
             case .Hashtag(let hashtag): didTapHashtag(hashtag)
-            case .URL(let url): didTapStringURL(url)
+            case .URL(let url, _): didTapStringURL(url)
             case .None: ()
             }
             
@@ -261,17 +261,17 @@ public protocol ActiveLabelDelegate: class {
             
             let maxLenght: Int = 6
             
-            for var element in elements {
-                if let text = element.element.stringURL where text.characters.count > maxLenght {
+            for var object in elements {
+                if let text = object.element.stringURL where text.characters.count > maxLenght {
                     let trimmedText = text.substringToIndex(text.startIndex.advancedBy(maxLenght))
-                    mutAttrString.replaceCharactersInRange(element.range, withString: trimmedText)
-                    element.range.length = maxLenght
+                    mutAttrString.replaceCharactersInRange(object.range, withString: trimmedText)
+                    object.range.length = maxLenght
                     if let index = activeElements[.URL]?.indexOf({ $0.element.stringURL == text }) {
                         activeElements[.URL]?.removeAtIndex(index)
-                        activeElements[.URL]?.append((element.range, ActiveElement.URL(trimmedText)))
+                        activeElements[.URL]?.append((object.range, ActiveElement.URL(url: text, displayURL: trimmedText)))
                     }
                 }
-                mutAttrString.setAttributes(attributes, range: element.range)
+                mutAttrString.setAttributes(attributes, range: object.range)
             }
         }
     }

@@ -11,13 +11,13 @@ import Foundation
 enum ActiveElement {
     case Mention(String)
     case Hashtag(String)
-    case URL(String)
+    case URL(url: String, displayURL: String)
     case None
     
     var stringURL: String? {
         switch self {
-        case .URL(let text):
-            return text
+        case .URL(let url, _):
+            return url
         case .Mention, .Hashtag, .None:
             return nil
         }
@@ -33,7 +33,7 @@ public enum ActiveType {
 
 func activeElement(word: String) -> ActiveElement {
     if let url = reduceRightToURL(word) {
-        return .URL(url)
+        return .URL(url: url, displayURL: url)
     }
     
     if word.characters.count < 2 {
