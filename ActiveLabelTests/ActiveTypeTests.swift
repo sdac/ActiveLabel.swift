@@ -15,7 +15,7 @@ func ==(a: ActiveElement, b: ActiveElement) -> Bool {
     switch (a, b) {
     case (.Mention(let a), .Mention(let b)) where a == b: return true
     case (.Hashtag(let a), .Hashtag(let b)) where a == b: return true
-    case (.URL(let a), .URL(let b)) where a == b: return true
+    case (.URL(let a1, let a2), .URL(let b1, let b2)) where a1 == b1 && a2 == b2: return true
     case (.None, .None): return true
     default: return false
     }
@@ -60,11 +60,21 @@ class ActiveTypeTests: XCTestCase {
     }
     
     func testURL() {
-        XCTAssertEqual(activeElement("http://www.google.com"), ActiveElement.URL("http://www.google.com"))
-        XCTAssertEqual(activeElement("https://www.google.com"), ActiveElement.URL("https://www.google.com"))
-        XCTAssertEqual(activeElement("https://www.google.com."), ActiveElement.URL("https://www.google.com"))
-        XCTAssertEqual(activeElement("www.google.com"), ActiveElement.URL("www.google.com"))
-        XCTAssertEqual(activeElement("google.com"), ActiveElement.URL("google.com"))
+        XCTAssertEqual(
+            activeElement("http://www.google.com"),
+            ActiveElement.URL(url: "http://www.google.com", displayURL: "http://www.google.com"))
+        XCTAssertEqual(
+            activeElement("https://www.google.com"),
+            ActiveElement.URL(url: "https://www.google.com", displayURL: "https://www.google.com"))
+        XCTAssertEqual(
+            activeElement("https://www.google.com."),
+            ActiveElement.URL(url: "https://www.google.com", displayURL: "https://www.google.com"))
+        XCTAssertEqual(
+            activeElement("www.google.com"),
+            ActiveElement.URL(url: "www.google.com", displayURL: "www.google.com"))
+        XCTAssertEqual(
+            activeElement("google.com"),
+            ActiveElement.URL(url: "google.com", displayURL: "google.com"))
     }
     
 }
