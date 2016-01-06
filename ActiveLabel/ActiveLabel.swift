@@ -255,34 +255,54 @@ public protocol ActiveLabelDelegate: class {
 
     /// use regex check all link ranges
     private func parseTextAndExtractActiveElements(attrString: NSAttributedString) {
-        let textString = attrString.string as NSString
-        let textLength = textString.length
-        var searchRange = NSMakeRange(0, textLength)
-        var components = textString.componentsSeparatedByCharactersInSet(NSCharacterSet.whitespaceAndNewlineCharacterSet())
+        let textString = attrString.string
+        let textNSString = attrString.string as NSString
+        let textLength = textString.characters.count
         
-        for word in components.reverse() {
-            print(word)
-            let element = activeElement(word)
-            
-            if case .None = element {
-                continue
-            }
-            
-            let elementRange = textString.rangeOfString(word, options: .BackwardsSearch, range: searchRange)
-            defer {
-                let endIndex = elementRange.location + elementRange.length
-                searchRange = NSMakeRange(0, endIndex)
-            }
-            
-            switch element {
-            case .Mention where mentionEnabled:
-                activeElements[.Mention]?.append((elementRange, element))
-            case .Hashtag where hashtagEnabled:
-                activeElements[.Hashtag]?.append((elementRange, element))
-            case .URL where URLEnabled:
-                activeElements[.URL]?.append((elementRange, element))
-            default: ()
-            }
+        var hashtags: [NSTextCheckingResult] = []
+        var mentions: [NSTextCheckingResult] = []
+        var urls: [NSTextCheckingResult] = []
+        
+        //URLS
+        if let urlDetector = try? NSDataDetector(types: NSTextCheckingType.Link.rawValue) {
+            let results = urlDetector.matchesInString(textString,
+                options: .ReportCompletion,
+                range: NSRange(location: 0, length: textLength))
+            urls.appendContentsOf(results)
+        }
+        
+        for url in urls where url.range.length > 2 {
+            let word = textNSString.substringWithRange(url.range)
+            let element = ActiveElement.URL(url: word, displayURL: word)
+            activeElements[.URL]?.append((url.range, element))
+        }
+        
+        //HASHTAGS
+        if let regex = try? NSRegularExpression(pattern: "#[a-z0-9_]*", options: [.CaseInsensitive]) {
+            let results = regex.matchesInString(textString,
+                options: [],
+                range: NSRange(location: 0, length: textLength))
+            hashtags.appendContentsOf(results)
+        }
+        
+        for hashtag in hashtags where hashtag.range.length > 2 {
+            let word = textNSString.substringWithRange(hashtag.range)
+            let element = ActiveElement.Hashtag(word)
+            activeElements[.Hashtag]?.append((hashtag.range, element))
+        }
+        
+        //MENTIONS
+        if let regex = try? NSRegularExpression(pattern: "@[a-z0-9_]*", options: [.CaseInsensitive]) {
+            let results = regex.matchesInString(textString,
+                options: [],
+                range: NSRange(location: 0, length: textLength))
+            mentions.appendContentsOf(results)
+        }
+        
+        for mention in mentions where mention.range.length > 2 {
+            let word = textNSString.substringWithRange(mention.range)
+            let element = ActiveElement.Mention(word)
+            activeElements[.Mention]?.append((mention.range, element))
         }
     }
     
@@ -309,7 +329,7 @@ public protocol ActiveLabelDelegate: class {
             }
             
             var objectIndex: Int = 0
-            for var object in currentElement.1 {
+            for var object in currentElement.1.reverse() {
                 defer {
                     mutAttrString.setAttributes(attributes, range: object.range)
                 }
