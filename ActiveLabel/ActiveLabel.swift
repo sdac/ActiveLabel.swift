@@ -17,6 +17,7 @@ public protocol ActiveLabelDelegate: class {
     
     // MARK: - public properties
     public weak var delegate: ActiveLabelDelegate?
+    public var urlMaxLenght: Int?
     
     @IBInspectable public var mentionEnabled: Bool = true {
         didSet {
@@ -232,81 +233,6 @@ public protocol ActiveLabelDelegate: class {
         setNeedsDisplay()
     }
     
-    private func textOrigin(inRect rect: CGRect) -> CGPoint {
-        let usedRect = layoutManager.usedRectForTextContainer(textContainer)
-        let heightDiff = rect.height - usedRect.height
-        let glyphOriginY = heightDiff > 0 ? rect.origin.y + heightDiff/2 : rect.origin.y
-        return CGPoint(x: rect.origin.x, y: glyphOriginY)
-    }
-    
-    /// add link attribute
-    private func addLinkAttribute(mutAttrString: NSMutableAttributedString) {
-        var range = NSRange(location: 0, length: 0)
-        var attributes = mutAttrString.attributesAtIndex(0, effectiveRange: &range)
-        
-        attributes[NSFontAttributeName] = font!
-        attributes[NSForegroundColorAttributeName] = textColor
-        mutAttrString.addAttributes(attributes, range: range)
-        
-        attributes[NSForegroundColorAttributeName] = mentionColor
-        
-        for (type, elements) in activeElements {
-            
-            switch type {
-            case .Mention: attributes[NSForegroundColorAttributeName] = mentionColor
-            case .Hashtag: attributes[NSForegroundColorAttributeName] = hashtagColor
-            case .URL: attributes[NSForegroundColorAttributeName] = URLColor
-            case .None: ()
-            }
-            
-            let maxLenght: Int = 6
-            
-            for var object in elements {
-                if let text = object.element.stringURL where text.characters.count > maxLenght {
-                    let trimmedText = text.substringToIndex(text.startIndex.advancedBy(maxLenght))
-                    mutAttrString.replaceCharactersInRange(object.range, withString: trimmedText)
-                    object.range.length = maxLenght
-                    if let index = activeElements[.URL]?.indexOf({ $0.element.stringURL == text }) {
-                        activeElements[.URL]?.removeAtIndex(index)
-                        activeElements[.URL]?.append((object.range, ActiveElement.URL(url: text, displayURL: trimmedText)))
-                    }
-                }
-                mutAttrString.setAttributes(attributes, range: object.range)
-            }
-        }
-    }
-    
-    /// use regex check all link ranges
-    private func parseTextAndExtractActiveElements(attrString: NSAttributedString) {
-        let textString = attrString.string as NSString
-        let textLength = textString.length
-        var searchRange = NSMakeRange(0, textLength)
-        
-        for word in textString.componentsSeparatedByCharactersInSet(NSCharacterSet.whitespaceAndNewlineCharacterSet()) {
-            let element = activeElement(word)
-    
-            if case .None = element {
-                continue
-            }
-            
-            let elementRange = textString.rangeOfString(word, options: .LiteralSearch, range: searchRange)
-            defer {
-                let startIndex = elementRange.location + elementRange.length
-                searchRange = NSMakeRange(startIndex, textLength - startIndex)
-            }
-            
-            switch element {
-            case .Mention where mentionEnabled:
-                activeElements[.Mention]?.append((elementRange, element))
-            case .Hashtag where hashtagEnabled:
-                activeElements[.Hashtag]?.append((elementRange, element))
-            case .URL where URLEnabled:
-                activeElements[.URL]?.append((elementRange, element))
-            default: ()
-            }
-        }
-    }
-    
     /// add line break mode
     private func addLineBreak(attrString: NSAttributedString) -> NSMutableAttributedString {
         let mutAttrString = NSMutableAttributedString(attributedString: attrString)
@@ -325,6 +251,104 @@ public protocol ActiveLabelDelegate: class {
         mutAttrString.setAttributes(attributes, range: range)
         
         return mutAttrString
+    }
+
+    /// use regex check all link ranges
+    private func parseTextAndExtractActiveElements(attrString: NSAttributedString) {
+        let textString = attrString.string as NSString
+        let textLength = textString.length
+        var searchRange = NSMakeRange(0, textLength)
+        var components = textString.componentsSeparatedByCharactersInSet(NSCharacterSet.whitespaceAndNewlineCharacterSet())
+        
+        for word in components.reverse() {
+            print(word)
+            let element = activeElement(word)
+            
+            if case .None = element {
+                continue
+            }
+            
+            let elementRange = textString.rangeOfString(word, options: .BackwardsSearch, range: searchRange)
+            defer {
+                let endIndex = elementRange.location + elementRange.length
+                searchRange = NSMakeRange(0, endIndex)
+            }
+            
+            switch element {
+            case .Mention where mentionEnabled:
+                activeElements[.Mention]?.append((elementRange, element))
+            case .Hashtag where hashtagEnabled:
+                activeElements[.Hashtag]?.append((elementRange, element))
+            case .URL where URLEnabled:
+                activeElements[.URL]?.append((elementRange, element))
+            default: ()
+            }
+        }
+    }
+    
+    /// add link attribute
+    private func addLinkAttribute(mutAttrString: NSMutableAttributedString) {
+        var range = NSRange(location: 0, length: 0)
+        var attributes = mutAttrString.attributesAtIndex(0, effectiveRange: &range)
+        
+        attributes[NSFontAttributeName] = font!
+        attributes[NSForegroundColorAttributeName] = textColor
+        mutAttrString.addAttributes(attributes, range: range)
+        
+        attributes[NSForegroundColorAttributeName] = mentionColor
+        
+        var activeElementsCopy = activeElements
+        
+        for currentElement in activeElements {
+            
+            switch currentElement.0 {
+            case .Mention: attributes[NSForegroundColorAttributeName] = mentionColor
+            case .Hashtag: attributes[NSForegroundColorAttributeName] = hashtagColor
+            case .URL: attributes[NSForegroundColorAttributeName] = URLColor
+            case .None: ()
+            }
+            
+            var objectIndex: Int = 0
+            for var object in currentElement.1 {
+                defer {
+                    mutAttrString.setAttributes(attributes, range: object.range)
+                }
+                if currentElement.0 != .URL { continue }
+                if let urlMaxLenght = urlMaxLenght, let urlsCount = activeElements[.URL]?.count {
+                    let newObject = trimUrlForElement(object, lenght: urlMaxLenght, mutAttrString: mutAttrString)
+                    let index = urlsCount - objectIndex - 1
+                    object = newObject
+                    activeElementsCopy[.URL]?.removeAtIndex(index)
+                    activeElementsCopy[.URL]?.insert(newObject, atIndex: index)
+                }
+                objectIndex++
+            }
+            
+            activeElements = activeElementsCopy
+        }
+    }
+    
+    private func trimUrlForElement(
+        var object: (range: _NSRange, element: ActiveElement),
+        lenght: Int,
+        mutAttrString: NSMutableAttributedString)
+        -> (range: _NSRange, element: ActiveElement) {
+            
+            if let text = object.element.stringURL
+                where text.characters.count > urlMaxLenght {
+                    let trimmedText = text.substringToIndex(text.startIndex.advancedBy(lenght))
+                    mutAttrString.replaceCharactersInRange(object.range, withString: trimmedText)
+                    object.range.length = lenght
+                    return (object.range, ActiveElement.URL(url: text, displayURL: trimmedText))
+            }
+            return object
+    }
+    
+    private func textOrigin(inRect rect: CGRect) -> CGPoint {
+        let usedRect = layoutManager.usedRectForTextContainer(textContainer)
+        let heightDiff = rect.height - usedRect.height
+        let glyphOriginY = heightDiff > 0 ? rect.origin.y + heightDiff/2 : rect.origin.y
+        return CGPoint(x: rect.origin.x, y: glyphOriginY)
     }
     
     private func updateAttributesWhenSelected(isSelected: Bool) {
